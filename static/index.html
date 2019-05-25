@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Node-SDR</title>
+</head>
+<body>
+    <h1>Test</h1>
+	<label for="freq">Select Frequency</label>
+	<input type='number' min="20" max="150" step="0.1" id="freq"/>
+	<button>Send Message</button>
+	<script>
+		let b = document.querySelector("button");
+		b.addEventListener("click", () => {
+			let f = document.getElementById("freq").value;
+			fetch(`/radio?freq=${f}`).then(res => console.log(res));
+		});
+	</script>
+</body>
+</html>
