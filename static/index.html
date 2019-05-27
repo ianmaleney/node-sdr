@@ -8,18 +8,20 @@
     <h1>Test</h1>
 	<label for="freq">Select Frequency</label>
 	<input type='number' min="20" max="150" step="0.1" id="freq"/>
-	<button>Send Message</button>
+	<button id="tune">Send Message</button>
+	<audio controls="controls" type="audio/ogg"></audio>
 	<h2></h2>
 	<script>
-		let b = document.querySelector("button");
-		b.addEventListener("click", () => {
+		let tuneButton = document.querySelector("#tune");
+
+		tuneButton.addEventListener("click", () => {
 			let f = document.getElementById("freq").value;
 			// fetch(`/radio?freq=${f}`).then(res => console.log(res));
 			const socketProtocol = (window.location.protocol === 'https:' ? 'wss:' : 'ws:')
 			const url = socketProtocol + '//' + window.location.hostname + ':3000/echo/';
 			const connection = new WebSocket(url);
 			connection.onopen = () => {
-				connection.send(f)
+				connection.send(f);
 			}
 			connection.onerror = error => {
 				console.log(`WebSocket error: ${error}`)
@@ -27,6 +29,7 @@
 			connection.onmessage = e => {
 				console.log(e.data);
 				document.querySelector("h2").innerHTML = e.data;
+				document.querySelector("audio").src = "http://127.0.0.1:8000/vorbis"
 			}
 		});
 	</script>

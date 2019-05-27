@@ -1,8 +1,19 @@
 const express = require("express");
 const app = express();
 const expressWs = require("express-ws")(app);
+var cors = require("cors");
 const port = 3000;
 const { spawn } = require("child_process");
+
+app.use(
+  cors({
+    allowedHeaders: ["sessionId", "Content-Type"],
+    exposedHeaders: ["sessionId"],
+    origin: "*",
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    preflightContinue: false
+  })
+);
 
 var state = {
   first_time: true
@@ -30,7 +41,7 @@ const playSocket = function(ws, freq) {
 
   sdr.stdout.on("data", data => {
     ws.send(`You are listening on: ${freq}Mhz`);
-    ws.send(`stdout: ${data}`);
+    ws.send(data);
   });
 
   sdr.stderr.on("data", data => {
