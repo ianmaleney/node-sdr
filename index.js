@@ -1,5 +1,6 @@
 const express = require("express");
 const app = express();
+const expressWs = require("express-ws")(app);
 const port = 3000;
 const { spawn } = require("child_process");
 
@@ -24,6 +25,25 @@ const play = function(req, res) {
   });
 };
 
+const playSocket = function(ws, freq) {
+  var sdr = spawn("bash", [__dirname + "/sdr.sh", freq]);
+
+  sdr.stdout.on("data", data => {
+    ws.send(`You are listening on: ${freq}Mhz`);
+    ws.send(`stdout: ${data}`);
+  });
+
+  sdr.stderr.on("data", data => {
+    console.log(`stderr: ${data}`);
+    ws.send(`stderr: ${data}`);
+  });
+
+  sdr.on("close", code => {
+    console.log(`child process exited with code ${code}`);
+    ws.send(`child process exited with code ${code}`);
+  });
+};
+
 app.get("/radio", (req, res) => {
   const kill = spawn("bash", [__dirname + "/kill.sh"]);
   kill.on("close", code => {
@@ -36,6 +56,24 @@ app.get("/radio", (req, res) => {
       res.send("Failed to kill the rtl_fm process.");
       console.log("Failed to kill the rtl_fm process.");
     }
+  });
+});
+
+app.ws("/echo", function(ws, req) {
+  ws.on("message", function(msg) {
+    const kill = spawn("bash", [__dirname + "/kill.sh"]);
+    kill.on("close", code => {
+      if (code === 0 || state.first_time) {
+        state.first_time = false;
+        setTimeout(() => {
+          playSocket(ws, msg);
+        }, 500);
+      } else {
+        ws.send("Failed to kill the rtl_fm process.");
+        console.log("Failed to kill the rtl_fm process.");
+        state.first_time = true;
+      }
+    });
   });
 });
 
