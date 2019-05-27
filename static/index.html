@@ -13,12 +13,15 @@
 	<h2></h2>
 	<script>
 		let tuneButton = document.querySelector("#tune");
+		let a = document.querySelector("audio");
+		let started = false;
 
 		tuneButton.addEventListener("click", () => {
 			let f = document.getElementById("freq").value;
 			// fetch(`/radio?freq=${f}`).then(res => console.log(res));
 			const socketProtocol = (window.location.protocol === 'https:' ? 'wss:' : 'ws:')
 			const url = socketProtocol + '//' + window.location.hostname + ':3000/echo/';
+			const srcURL = 'http://' + window.location.hostname + ':8000/vorbis';
 			const connection = new WebSocket(url);
 			connection.onopen = () => {
 				connection.send(f);
@@ -29,7 +32,11 @@
 			connection.onmessage = e => {
 				console.log(e.data);
 				document.querySelector("h2").innerHTML = e.data;
-				document.querySelector("audio").src = "http://127.0.0.1:8000/vorbis"
+				if (e.data.includes("Sampling at") && !started) {
+					started = true;
+					a.src = srcURL;
+					a.play();
+				}
 			}
 		});
 	</script>
