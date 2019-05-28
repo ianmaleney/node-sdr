@@ -1,5 +1,5 @@
 <ezstream>
-    <url>http://206.189.18.163:8000//vorbis</url>
+    <url>http://206.189.18.163:8000/vorbis</url>
     <sourcepassword>raspberry</sourcepassword>
     <format>VORBIS</format>
     <filename>stdin</filename>
