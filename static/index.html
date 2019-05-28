@@ -16,8 +16,8 @@
 		let a = document.querySelector("audio");
 		let started = false;
 
-		a.addEventListener("started", () => {
-			console.log("Audio Started");
+		a.addEventListener("loadeddata", () => {
+			console.log("Loaded Data");
 		});
 
 		tuneButton.addEventListener("click", () => {
