@@ -1,5 +1,5 @@
 <ezstream>
-    <url>http://localhost:8000/vorbis</url>
+    <url>http://206.189.18.163:8000//vorbis</url>
     <sourcepassword>raspberry</sourcepassword>
     <format>VORBIS</format>
     <filename>stdin</filename>
@@ -15,10 +15,10 @@
       It's up to you to make sure that the bitrate/quality/samplerate/channels
       information matches up with your input stream files.
      -->
-    <svrinfoname>My Stream</svrinfoname>
-    <svrinfourl>http://www.oddsock.org</svrinfourl>
+    <svrinfoname>DDR OPEN AIR</svrinfoname>
+    <svrinfourl>https://listen.dublindigitalradio.com/</svrinfourl>
     <svrinfogenre>RockNRoll</svrinfogenre>
-    <svrinfodescription>This is a stream description</svrinfodescription>
+    <svrinfodescription>Spectral Voices Damned to Air</svrinfodescription>
     <svrinfobitrate>128</svrinfobitrate>
     <svrinfoquality>2.0</svrinfoquality>
     <svrinfochannels>1</svrinfochannels>
