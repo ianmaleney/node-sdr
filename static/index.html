@@ -9,6 +9,12 @@
 			--primary-red: #ff4a4a;
 			--faded-grey: #777
 		}
+		*, *:before, *:after {
+			box-sizing: inherit;
+		}
+		html {
+			box-sizing: border-box;
+		}
 		body {
 			font-family: "Chivo-Regular", "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", "Helvetica", "Arial", sans-serif;
 		}
@@ -17,24 +23,43 @@
 			display: flex;
 			flex-direction: column;
 			align-items: center;
-			max-width: 320px;
+			max-width: 90vw;
 			border: 2px solid;
 			padding: 12px;
+			margin: 2rem auto;
 		}
 
 		label {
 			text-align: center;
    			font-weight: bold;
+			margin-bottom: 1rem;
+		}
+
+		.slider {
+			width: 100%;
+			margin: 1rem;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			margin-bottom: 2rem;
+		}
+
+		#slider-value {
+			width: 168px;
+			padding: 12px 24px;
+			border: 2px solid;
+			text-align: center;
+			margin: 0 0 2rem;
 		}
 
 		input {
 			font-size: 2rem;
 			border: 2px solid;
-			margin: 1rem;
+			width: 100%;
 		}
 
 		#tune {
-			border: 1px solid var(--primary-red);
+			border: 2px solid var(--primary-red);
 			color: white;
 			background-color: var(--primary-red);
 			font-size: 1.4rem;
@@ -43,15 +68,43 @@
 			padding: 8px 32px;
 		}
 
+		#tune:hover {
+			background-color: white;
+			color: var(--primary-red);
+			cursor: pointer;
+		}
+
 		audio {
 			margin: 1rem 0;
+		}
+
+		datalist {
+			display: flex;
+			width: 100%;
+			justify-content: space-between;
+			font-size: 0.7rem;
+			color: var(--faded-grey);
 		}
 	</style>
 </head>
 <body>
 	<div class="tuner">
-		<label for="freq">Select A Frequency<br>(24 - 1766)</label>
-		<input type='number' min="24" max="1766" step="0.1" id="freq"/>
+		<div class="slider">
+			<label for="freq">You are tuned to:</label>
+			<p id="slider-value"></p>
+			<datalist id="tickmarks">
+				<option value="20" label="20">
+				<option value="240" label="240">
+				<option value="460" label="460">
+				<option value="680" label="680">
+				<option value="873" label="873">
+				<option value="1120" label="1120">
+				<option value="1340" label="1340">
+				<option value="1560" label="1560">
+				<option value="1766" label="1766">
+			</datalist>
+			<input type='range' min="24" max="1766" step="0.1" id="freq" list="tickmarks"/>
+		</div>
 		<button id="tune">Tune In</button>
 	</div>
 
@@ -61,6 +114,8 @@
 	<script>
 		let tuneButton = document.querySelector("#tune");
 		let a = document.querySelector("audio");
+		let s = document.querySelector("input");
+		let p = document.querySelector("#slider-value");
 		const srcURL = 'http://206.189.18.163:8000/vorbis';
 		let started = false;
 
@@ -68,8 +123,13 @@
 			console.log("Loaded Data");
 		});
 
+		s.addEventListener("change", () => {
+			p.textContent = `${s.value}Mhz`;
+		});
+
 		document.addEventListener("DOMContentLoaded", () => {
 			console.log("Loaded");
+			p.textContent = `${s.value}Mhz`;
 			fetch(srcURL)
 				.then(data => data.status)
 				.then(status => {
