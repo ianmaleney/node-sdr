@@ -18,27 +18,27 @@
 
 		tuneButton.addEventListener("click", () => {
 			let f = document.getElementById("freq").value;
-			// fetch(`/radio?freq=${f}`).then(res => console.log(res));
-			const socketProtocol = (window.location.protocol === 'https:' ? 'wss:' : 'ws:')
-			const url = socketProtocol + '//' + window.location.hostname + ':3000/radio';
+			let data = {
+				freq: f
+			};
 			const srcURL = 'http://206.189.18.163:8000/vorbis';
-			const connection = new WebSocket(url);
-			connection.onopen = () => {
-				connection.send(f);
-				console.log(`Tuning to Frequency: ${f}Mhz`);
-			}
-			connection.onerror = error => {
-				console.log(`WebSocket error: ${error}`)
-			}
-			connection.onmessage = e => {
-				console.log(e.data);
-				document.querySelector("h2").innerHTML = e.data;
-				if (e.data.includes("Sampling at") && !started) {
-					started = true;
-					a.src = srcURL;
-				}
-				a.play();
-			}
+			fetch(`/radio`, {
+				method: 'post',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				cache: "no-store",
+				body: JSON.stringify(data)
+			})
+				.then(res => res.text())
+				.then(text => {
+					console.log(text);
+					if (text.includes("ready")) {
+						if (!started) started = true;
+						if (!a.src) a.src = srcURL;
+						a.play();
+					}
+				});
 		});
 	</script>
 </body>

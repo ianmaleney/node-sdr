@@ -1,47 +1,58 @@
 const express = require("express");
 const app = express();
-const expressWs = require("express-ws")(app);
 const port = 3000;
 const { spawn } = require("child_process");
+const bodyParser = require("body-parser");
+const compression = require("compression");
+const EventEmitter = require("events");
+app.use(bodyParser.json());
+app.use(compression());
+class MyEmitter extends EventEmitter {}
+const myEmitter = new MyEmitter();
 
 var state = {
   first_time: true
 };
 
-const playSocket = function(ws, freq) {
-  var sdr = spawn("bash", [__dirname + "/sdr.sh", freq]);
+myEmitter.on("radio_ready", res => {
+  res.send("ready");
+});
+
+const play = async function(req, res) {
+  var freq = await req.body.freq.toString();
+  var sdr = await spawn("bash", [__dirname + "/sdr.sh", freq]);
 
   sdr.stdout.on("data", data => {
-    ws.send(`You are listening on: ${freq}Mhz`);
-    ws.send(data);
+    res.send(data);
   });
 
   sdr.stderr.on("data", data => {
     console.log(`stderr: ${data}`);
-    ws.send(`stderr: ${data}`);
+    if (data.includes("Output at")) {
+      myEmitter.emit("radio_ready", res);
+    }
   });
 
   sdr.on("close", code => {
     console.log(`child process exited with code ${code}`);
-    ws.send(`child process exited with code ${code}`);
   });
 };
 
-app.ws("/radio", function(ws, req) {
-  ws.on("message", function(msg) {
-    const kill = spawn("bash", [__dirname + "/kill.sh"]);
-    kill.on("close", code => {
-      if (code === 0 || state.first_time) {
-        state.first_time = false;
-        setTimeout(() => {
-          playSocket(ws, msg);
-        }, 500);
-      } else {
-        ws.send("Failed to kill the rtl_fm process.");
-        console.log("Failed to kill the rtl_fm process.");
-        state.first_time = true;
-      }
-    });
+app.post("/radio", (req, res) => {
+  const kill = spawn("bash", [__dirname + "/kill.sh"]);
+  kill.on("close", code => {
+    if (state.first_time) {
+      res.setHeader("Content-Type", "text/html");
+    }
+    if (code === 0 || state.first_time) {
+      state.first_time = false;
+      setTimeout(() => {
+        play(req, res);
+      }, 100);
+    } else {
+      res.send("Failed to kill the rtl_fm process.");
+      console.log("Failed to kill the rtl_fm process.");
+    }
   });
 });
 
