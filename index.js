@@ -4,6 +4,7 @@ const port = 3000;
 const { spawn } = require("child_process");
 const bodyParser = require("body-parser");
 app.use(bodyParser.json());
+app.use(express.static("static"));
 
 var state = {
   first_time: true
