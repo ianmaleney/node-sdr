@@ -3,33 +3,20 @@ const app = express();
 const port = 3000;
 const { spawn } = require("child_process");
 const bodyParser = require("body-parser");
-const compression = require("compression");
-const EventEmitter = require("events");
 app.use(bodyParser.json());
-app.use(compression());
-class MyEmitter extends EventEmitter {}
-const myEmitter = new MyEmitter();
 
 var state = {
   first_time: true
 };
 
-myEmitter.on("radio_ready", res => {
-  res.send("ready");
-});
-
 const play = async function(req, res) {
   var freq = await req.body.freq.toString();
   var sdr = await spawn("bash", [__dirname + "/sdr.sh", freq]);
 
-  sdr.stdout.on("data", data => {
-    res.send(data);
-  });
-
   sdr.stderr.on("data", data => {
     console.log(`stderr: ${data}`);
     if (data.includes("Output at")) {
-      myEmitter.emit("radio_ready", res);
+      res.send("ready");
     }
   });
 

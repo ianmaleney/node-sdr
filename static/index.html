@@ -16,6 +16,10 @@
 		let a = document.querySelector("audio");
 		let started = false;
 
+		a.addEventListener("started", () => {
+			console.log("Audio Started");
+		});
+
 		tuneButton.addEventListener("click", () => {
 			let f = document.getElementById("freq").value;
 			let data = {
@@ -35,7 +39,8 @@
 					console.log(text);
 					if (text.includes("ready")) {
 						if (!started) started = true;
-						if (!a.src) a.src = srcURL;
+						if (a.src) a.src = null;
+						a.src = srcURL;
 						a.play();
 					}
 				});
