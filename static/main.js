@@ -3,9 +3,85 @@ let b = document.querySelector("#tune");
 let a = document.querySelector("audio");
 let s = document.querySelector("input");
 let p = document.querySelector("#slider-value");
-const stream_url = "http://206.189.18.163:8000/vorbis";
 
-let svgString = '<svg><path d="M10,10 L50,100 L90,50"></path></svg>';
+// Audio
+(function() {
+  // An array of all contexts to resume on the page
+  const audioContextList = [];
+
+  // An array of various user interaction events we should listen for
+  const userInputEventNames = [
+    "click",
+    "contextmenu",
+    "auxclick",
+    "dblclick",
+    "mousedown",
+    "mouseup",
+    "pointerup",
+    "touchend",
+    "keydown",
+    "keyup"
+  ];
+
+  // A proxy object to intercept AudioContexts and
+  // add them to the array for tracking and resuming later
+  self.AudioContext = new Proxy(self.AudioContext, {
+    construct(target, args) {
+      const result = new target(...args);
+      audioContextList.push(result);
+      return result;
+    }
+  });
+
+  // To resume all AudioContexts being tracked
+  function resumeAllContexts(event) {
+    let count = 0;
+
+    audioContextList.forEach(context => {
+      if (context.state !== "running") {
+        context.resume();
+      } else {
+        count++;
+      }
+    });
+
+    // If all the AudioContexts have now resumed then we
+    // unbind all the event listeners from the page to prevent
+    // unnecessary resume attempts
+    if (count == audioContextList.length) {
+      userInputEventNames.forEach(eventName => {
+        document.removeEventListener(eventName, resumeAllContexts);
+      });
+    }
+  }
+
+  // We bind the resume function for each user interaction
+  // event on the page
+  userInputEventNames.forEach(eventName => {
+    document.addEventListener(eventName, resumeAllContexts);
+  });
+})();
+
+const stream_url = "http://206.189.18.163:8000/vorbis";
+var context = new (window.AudioContext || window.webkitAudioContext)();
+var audioStack = [];
+var nextTime = 0;
+
+const scheduleBuffers = function() {
+  if (context.state === "suspended") {
+    context.resume();
+    console.log("Context Resumed");
+  }
+  while (audioStack.length) {
+    var buffer = audioStack.shift();
+    var source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(context.destination);
+    if (nextTime == 0) nextTime = context.currentTime + 0.01; /// add 50ms latency
+    source.start(nextTime);
+    nextTime += source.buffer.duration; // Make the next buffer wait the length of the last buffer playing
+  }
+};
 
 // Events
 var updatePlayState = new Event("update_play_state");
@@ -144,32 +220,59 @@ s.addEventListener("change", () => {
   }
 });
 
+document.querySelector("#play").addEventListener("click", () => {
+  if (audioStack.length) {
+    scheduleBuffers();
+  }
+});
+
 const start = function() {
   dispatchPlayState("tuning");
-  let data = {
-    freq: state.frequency
+
+  const url = `ws://${window.location.hostname}:3000/radio`;
+  const connection = new WebSocket(url);
+
+  connection.binaryType = "arraybuffer";
+
+  connection.onopen = () => {
+    connection.send(state.frequency);
   };
 
-  fetch(`/radio`, {
-    method: "post",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    cache: "no-store",
-    body: JSON.stringify(data)
-  })
-    .then(res => res.json())
-    .then(server_state => {
-      dispatchFrequency(server_state.freq);
-      console.log(server_state);
-      if (server_state.message === "ready") {
-        if (!state.started) body.dispatchEvent(updateStarted);
-        a.src = null;
-        a.src = stream_url;
-        a.play();
-        dispatchPlayState("closed");
-      }
-    });
+  connection.onmessage = e => {
+    // console.log(e);
+    new Response(e.data)
+      .arrayBuffer()
+      .then(array_buffer => {
+        console.log(array_buffer);
+        return array_buffer;
+      })
+      .then(array_buffer => context.decodeAudioData(array_buffer))
+      .then(audio_buffer => {
+        audioStack.push(audio_buffer);
+        console.log(audio_buffer);
+      });
+  };
+
+  //   fetch(`/radio`, {
+  //     method: "post",
+  //     headers: {
+  //       "Content-Type": "application/json"
+  //     },
+  //     cache: "no-store",
+  //     body: JSON.stringify(data)
+  //   })
+  //     .then(res => res.json())
+  //     .then(server_state => {
+  //       dispatchFrequency(server_state.freq);
+  //       console.log(server_state);
+  //       if (server_state.message === "ready") {
+  //         if (!state.started) body.dispatchEvent(updateStarted);
+  //         a.src = null;
+  //         a.src = stream_url;
+  //         a.play();
+  //         dispatchPlayState("closed");
+  //       }
+  //     });
 };
 
 const pause = function() {

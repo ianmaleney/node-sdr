@@ -3,92 +3,69 @@ const app = express();
 const port = 3000;
 const { spawn } = require("child_process");
 const bodyParser = require("body-parser");
-const EventEmitter = require("events");
+var expressWs = require("express-ws")(app);
+const RtlSdr = require("rtlsdrjs");
+var Readable = require("stream").Readable;
+var rs = Readable();
 app.use(bodyParser.json());
 app.use(express.static("static"));
+let readSamples = true;
 
-var state = {
-  first_time: true,
-  ready: true,
-  open: true,
-  freq: 0,
-  message: ""
-};
-
-class SetOpenState extends EventEmitter {}
-const setOpenState = new SetOpenState();
-
-setOpenState.on("access", () => {
-  setTimeout(() => {
-    state.open = true;
-    console.log("Open to new requests");
-  }, 10000);
-});
-
-setOpenState.on("ready", () => {
-  setTimeout(() => {
-    state.ready = true;
-    console.log("Ready");
-  }, 2000);
-});
-
-const play = async function(req, res) {
-  var freq = await req.body.freq.toString();
-  var sdr = await spawn("bash", [__dirname + "/sdr.sh", freq]);
-
-  state.freq = freq;
-  state.ready = false;
-  state.open = false;
-  console.log("Closed to Requests");
-
-  sdr.stderr.on("data", data => {
-    console.log(`stderr: ${data}`);
-    if (data.includes("Output at")) {
-      state.message = "ready";
-      res.send(state);
-    }
+async function start(freq, ws) {
+  //
+  // request a device
+  // RtlSdr.getDevices() can be used to get a list of all RTL SDR's attached to system
+  //
+  const sdr = await RtlSdr.requestDevice();
+  var ez = await spawn("bash", [__dirname + "/ez.sh"], {
+    stdio: [process.stdin, process.stdout, process.stderr]
   });
 
-  sdr.on("close", code => {
-    console.log(`child process exited with code ${code}`);
+  //
+  // open the device
+  //
+  // supported options are:
+  // - ppm: frequency correction factor, in parts per million (defaults to 0)
+  // - gain: optional gain in dB, auto gain is used if not specified
+  //
+  await sdr.open({
+    ppm: 5
   });
-};
 
-app.get("/state", (req, res) => {
-  res.send(state);
-});
+  //
+  // set sample rate and center frequency in Hz
+  // - returns the actual values set
+  //
+  const actualSampleRate = await sdr.setSampleRate(2000000);
+  const convertFreq = await function(raw_freq) {
+    return raw_freq * 10000000;
+  };
+  const actualCenterFrequency = await sdr.setCenterFrequency(convertFreq(freq));
 
-app.post("/state", (req, res) => {
-  var playing = req.body.ready;
-  if (playing) {
-    setOpenState.emit("ready");
-    setOpenState.emit("access");
+  //
+  // reset the buffer
+  //
+  await sdr.resetBuffer();
+
+  var rs = new Readable();
+
+  while (readSamples) {
+    //
+    // read some samples
+    // - returns an ArrayBuffer with the specified number of samples,
+    //   data is interleaved in IQ format
+    //
+    const samples = await sdr.readSamples(16 * 16384);
+    const buffer = Buffer.from(samples);
+    rs._read = () => {};
+    rs.push(buffer);
+    rs.pipe(process.stdout);
   }
-  res.send(state);
-});
+}
 
-const check_if_ready = function(open_state, req, res) {
-  if (open_state) {
-    console.log("Ready to Play");
-    play(req, res);
-  } else {
-    console.log("Not Ready Yet");
-    setTimeout(() => {
-      check_if_ready(state.open, req, res);
-    }, 1000);
-  }
-};
-
-app.post("/radio", (req, res) => {
-  const kill = spawn("bash", [__dirname + "/kill.sh"]);
-  kill.on("close", code => {
-    if (code === 0 || state.first_time) {
-      state.first_time = false;
-      check_if_ready(state.open, req, res);
-    } else {
-      res.send("Failed to kill the rtl_fm process.");
-      console.log("Failed to kill the rtl_fm process.");
-    }
+app.ws("/radio", (ws, req) => {
+  ws.on("message", function(msg) {
+    start(msg, ws);
   });
 });
 
