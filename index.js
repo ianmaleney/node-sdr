@@ -1,52 +1,55 @@
 const express = require("express");
 const app = express();
 const port = 3000;
+var expressWs = require("express-ws")(app);
+const EventEmitter = require("events");
 const { spawn } = require("child_process");
 const bodyParser = require("body-parser");
-const EventEmitter = require("events");
 app.use(bodyParser.json());
 app.use(express.static("static"));
 
 var state = {
   first_time: true,
-  ready: true,
-  open: true,
-  freq: 0,
-  message: ""
+  frequency: 0,
+  time_start: 0
 };
 
-class SetOpenState extends EventEmitter {}
-const setOpenState = new SetOpenState();
+class passMessage extends EventEmitter {}
+const message = new passMessage();
 
-setOpenState.on("access", () => {
-  setTimeout(() => {
-    state.open = true;
-    console.log("Open to new requests");
-  }, 10000);
+message.on("update", (freq, time) => {
+  state.frequency = freq;
+  state.time_start = time;
 });
 
-setOpenState.on("ready", () => {
-  setTimeout(() => {
-    state.ready = true;
-    console.log("Ready");
-  }, 2000);
-});
+const ranges = [
+  [20, 30],
+  [30, 70],
+  [70, 88],
+  [88, 118],
+  [118, 137],
+  [156, 174]
+];
 
-const play = async function(req, res) {
-  var freq = await req.body.freq.toString();
+function randomIntFromInterval(min, max) {
+  return Math.floor(Math.random() * (max - min + 1) + min);
+}
+
+const getFreq = function(ranges) {
+  let random_range = Math.floor(Math.random() * ranges.length);
+  let [min, max] = ranges[random_range];
+  let random_freq = randomIntFromInterval(min, max);
+  return random_freq;
+};
+
+const tune = async function() {
+  let freq = getFreq(ranges);
   var sdr = await spawn("bash", [__dirname + "/sdr.sh", freq]);
-
-  state.freq = freq;
-  state.ready = false;
-  state.open = false;
-  console.log("Closed to Requests");
+  let now = new Date().getTime();
+  message.emit("update", freq, now);
 
   sdr.stderr.on("data", data => {
     console.log(`stderr: ${data}`);
-    if (data.includes("Output at")) {
-      state.message = "ready";
-      res.send(state);
-    }
   });
 
   sdr.on("close", code => {
@@ -54,46 +57,22 @@ const play = async function(req, res) {
   });
 };
 
-app.get("/state", (req, res) => {
-  res.send(state);
+app.get("/", function(req, res) {
+  res.sendFile("static/index.html", { root: __dirname });
 });
 
-app.post("/state", (req, res) => {
-  var playing = req.body.ready;
-  if (playing) {
-    setOpenState.emit("ready");
-    setOpenState.emit("access");
-  }
-  res.send(state);
-});
-
-const check_if_ready = function(open_state, req, res) {
-  if (open_state) {
-    console.log("Ready to Play");
-    play(req, res);
-  } else {
-    console.log("Not Ready Yet");
-    setTimeout(() => {
-      check_if_ready(state.open, req, res);
-    }, 1000);
-  }
-};
-
-app.post("/radio", (req, res) => {
-  const kill = spawn("bash", [__dirname + "/kill.sh"]);
-  kill.on("close", code => {
-    if (code === 0 || state.first_time) {
-      state.first_time = false;
-      check_if_ready(state.open, req, res);
-    } else {
-      res.send("Failed to kill the rtl_fm process.");
-      console.log("Failed to kill the rtl_fm process.");
+app.ws("/socket", function(ws, req) {
+  ws.on("message", function(msg) {
+    if (msg === "get_freq") {
+      ws.send(JSON.stringify(state));
     }
   });
 });
 
-app.get("/", function(req, res) {
-  res.sendFile("static/index.html", { root: __dirname });
-});
+tune();
+setInterval(() => {
+  console.log("Tuning");
+  tune();
+}, 1000 * 60);
 
 app.listen(port, () => console.log(`Example app listening on port ${port}!`));

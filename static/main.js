@@ -124,17 +124,12 @@ a.addEventListener("loadeddata", () => {
 a.addEventListener("ended", () => {
   console.log("ended");
   dispatchPlayState("tuning");
-  fetch("/state")
-    .then(res => res.json())
-    .then(server_state => {
-      console.log(server_state);
-      if (server_state.ready) {
-        a.src = null;
-        a.src = stream_url;
-        a.play();
-        dispatchFrequency(server_state.freq);
-      }
-    });
+  setTimeout(() => {
+    a.src = null;
+    a.src = stream_url;
+    a.play();
+    dispatchFrequency(server_state.freq);
+  }, 3500);
 });
 
 s.addEventListener("change", () => {
@@ -146,30 +141,10 @@ s.addEventListener("change", () => {
 
 const start = function() {
   dispatchPlayState("tuning");
-  let data = {
-    freq: state.frequency
-  };
-
-  fetch(`/radio`, {
-    method: "post",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    cache: "no-store",
-    body: JSON.stringify(data)
-  })
-    .then(res => res.json())
-    .then(server_state => {
-      dispatchFrequency(server_state.freq);
-      console.log(server_state);
-      if (server_state.message === "ready") {
-        if (!state.started) body.dispatchEvent(updateStarted);
-        a.src = null;
-        a.src = stream_url;
-        a.play();
-        dispatchPlayState("closed");
-      }
-    });
+  a.src = null;
+  a.src = stream_url;
+  a.play();
+  dispatchPlayState("closed");
 };
 
 const pause = function() {
